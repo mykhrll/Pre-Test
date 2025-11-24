@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pretest Jaringan - Cyber Edition</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #000; overflow-x: hidden; color: #f1f5f9; font-family: sans-serif; }
+    .fade-in { animation: fadeIn 0.5s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .glass-effect { backdrop-filter: blur(10px); background-color: rgba(30, 41, 59, 0.85); border: 1px solid rgba(59, 130, 246, 0.3); }
+    .option-btn { transition: all 0.2s; cursor: pointer; position: relative; overflow: hidden; }
+    .option-btn:hover:not(:disabled) { transform: translateX(5px); background-color: rgba(59, 130, 246, 0.2); border-color: #3b82f6; }
+    
+    /* Warna khusus Pretest (Netral saat dipilih) */
+    .selected { background-color: #f59e0b !important; border-color: #fbbf24 !important; color: black !important; }
+
+    #matrixCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.2; pointer-events: none; }
+    .audio-control { position: fixed; bottom: 20px; right: 20px; z-index: 100; background: rgba(0,0,0,0.7); border: 1px solid #3b82f6; color: white; padding: 10px; border-radius: 50%; cursor: pointer; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+    .audio-control:hover { box-shadow: 0 0 15px #3b82f6; }
+  </style>
+</head>
+<body class="w-full min-h-screen flex items-center justify-center p-4">
+
+  <canvas id="matrixCanvas"></canvas>
+  <button id="audioToggle" class="audio-control" onclick="toggleAudio()">🔊</button>
+
+  <div id="app" class="w-full max-w-4xl relative z-10"></div>
+
+  <script>
+    /* --- AUDIO SYSTEM --- */
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = new AudioContext();
+    let isMuted = false;
+    let bgmInterval = null;
+
+    function playTone(freq, type, duration) {
+        if (isMuted) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.type = type; osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+    
+    const SFX = {
+        click: () => playTone(800, 'sine', 0.1),
+        select: () => playTone(600, 'square', 0.1),
+        win: () => [400, 500, 600, 800].forEach((f, i) => setTimeout(() => playTone(f, 'sine', 0.3), i*150))
+    };
+
+    function startBGM() {
+        if(isMuted) return;
+        const playChord = () => {
+            if(isMuted) return;
+            [110, 130, 164].forEach(f => { // Dark ambient chord
+                const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                o.type = 'triangle'; o.frequency.value = f;
+                g.gain.setValueAtTime(0, audioCtx.currentTime);
+                g.gain.linearRampToValueAtTime(0.02, audioCtx.currentTime + 1);
+                g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 4);
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start(); o.stop(audioCtx.currentTime + 4);
+            });
+        };
+        playChord();
+        bgmInterval = setInterval(playChord, 4000);
+    }
+
+    function toggleAudio() {
+        isMuted = !isMuted;
+        document.getElementById('audioToggle').innerText = isMuted ? '🔇' : '🔊';
+        if(!isMuted) { audioCtx.resume(); startBGM(); } 
+        else { clearInterval(bgmInterval); }
+    }
+
+    /* --- MATRIX RAIN --- */
+    const canvas = document.getElementById('matrixCanvas'), ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    const cols = canvas.width/14, drops = Array(Math.floor(cols)).fill(1);
+    function drawMatrix() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#0F0'; ctx.font = '14px monospace';
+        drops.forEach((y, i) => {
+            const text = '01IPv4IPv6'[Math.floor(Math.random()*10)];
+            ctx.fillText(text, i*14, y*14);
+            if(y*14 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+        });
+        requestAnimationFrame(drawMatrix);
+    }
+    drawMatrix();
+
+    /* --- DATA SOAL PRETEST (30 Soal) --- */
+    // Konsep sama dengan posttest, tapi kalimat berbeda.
+    const pretestData = [
+        { q: "Berapa total panjang bit pada alamat IPv4?", opt: ["16 bit", "32 bit", "64 bit", "128 bit", "256 bit"], c: 1 },
+        { q: "Alamat IP yang dikonfigurasi secara manual dan tidak berubah disebut?", opt: ["IP Dinamis", "IP Broadcast", "IP Static", "IP DHCP", "IP Overlap"], c: 2 },
+        { q: "Rentang oktet pertama untuk IP Kelas A adalah?", opt: ["1 - 126", "128 - 191", "192 - 223", "224 - 239", "240 - 255"], c: 0 },
+        { q: "Fungsi utama dari protokol NAT adalah?", opt: ["Mengamankan data", "Menerjemahkan IP Private ke Public", "Memberikan IP otomatis", "Mendeteksi virus", "Menghubungkan kabel"], c: 1 },
+        { q: "Metode pengiriman data dari satu ke semua host dalam jaringan disebut?", opt: ["Unicast", "Multicast", "Anycast", "Broadcast", "Simulcast"], c: 3 },
+        { q: "Berapa panjang bit dari alamat IPv6?", opt: ["32 bit", "64 bit", "128 bit", "256 bit", "512 bit"], c: 2 },
+        { q: "Penulisan alamat IPv6 menggunakan format bilangan?", opt: ["Biner", "Desimal", "Oktaf", "Heksadesimal", "Romawi"], c: 3 },
+        { q: "192.168.10.1 termasuk dalam kategori IP?", opt: ["Public Class A", "Private Class C", "Public Class C", "Private Class B", "Loopback"], c: 1 },
+        { q: "Protokol yang memberikan alamat IP secara otomatis kepada klien adalah?", opt: ["DNS", "FTP", "DHCP", "HTTP", "SMTP"], c: 2 },
+        { q: "Alamat 127.0.0.1 digunakan untuk?", opt: ["Koneksi Internet", "Loopback / Localhost", "Broadcast", "Multicast", "Gateway"], c: 1 },
+        { q: "Rentang oktet pertama untuk IP Kelas C adalah?", opt: ["1 - 126", "128 - 191", "192 - 223", "224 - 239", "240 - 255"], c: 2 },
+        { q: "IP Address yang digunakan agar perangkat bisa diakses dari jaringan internet global adalah?", opt: ["IP Private", "IP Local", "IP Public", "IP Loopback", "IP Hybrid"], c: 2 },
+        { q: "Komunikasi 'One to Many' untuk grup tertentu disebut?", opt: ["Unicast", "Multicast", "Broadcast", "Anycast", "Telecast"], c: 1 },
+        { q: "Prefix /24 setara dengan subnet mask?", opt: ["255.0.0.0", "255.255.0.0", "255.255.255.0", "255.255.255.128", "255.255.255.255"], c: 2 },
+        { q: "Dalam IPv6, alamat ::1 merepresentasikan?", opt: ["Broadcast", "Route Default", "Multicast", "Loopback", "Unspecified"], c: 3 },
+        { q: "Rentang IP 169.254.x.x dikenal sebagai?", opt: ["APIPA", "Static", "Public", "VPN", "Proxy"], c: 0 },
+        { q: "Kelas IP yang digunakan khusus untuk Multicast adalah?", opt: ["Kelas A", "Kelas B", "Kelas C", "Kelas D", "Kelas E"], c: 3 },
+        { q: "Salah satu keunggulan utama IPv6 dibandingkan IPv4 adalah?", opt: ["Alamat lebih sedikit", "Keamanan (IPSec) bawaan", "Format desimal", "Lebih lambat", "Tidak butuh router"], c: 1 },
+        { q: "IP Address terdiri dari dua bagian utama, yaitu?", opt: ["Head & Body", "Network ID & Host ID", "Mac & IP", "TCP & UDP", "Bit & Byte"], c: 1 },
+        { q: "Perangkat yang berfungsi menghubungkan jaringan yang berbeda segmen IP adalah?", opt: ["Switch", "Hub", "Router", "Repeater", "Modem"], c: 2 },
+        { q: "Format penulisan IPv4 menggunakan pemisah tanda?", opt: ["Titik (Dot)", "Koma", "Titik Dua (Colon)", "Garis Miring", "Spasi"], c: 0 },
+        { q: "Dalam format heksadesimal IPv6, huruf 'F' bernilai desimal?", opt: ["10", "12", "14", "15", "16"], c: 3 },
+        { q: "Jenis IP yang berubah-ubah setiap kali terkoneksi ulang disebut?", opt: ["IP Static", "IP Dynamic", "IP Fixed", "IP Root", "IP Anchor"], c: 1 },
+        { q: "IP Kelas B memiliki rentang oktet pertama?", opt: ["1-126", "128-191", "192-223", "224-239", "240-255"], c: 1 },
+        { q: "Komunikasi 'One to One' disebut?", opt: ["Unicast", "Multicast", "Broadcast", "Omnicast", "Simplex"], c: 0 },
+        { q: "IPv6 menggunakan pengganti ARP yang disebut?", opt: ["RARP", "NDP", "ICMPv4", "OSPF", "BGP"], c: 1 },
+        { q: "Subnet mask default untuk Kelas A adalah?", opt: ["255.0.0.0", "255.255.0.0", "255.255.255.0", "255.255.255.255", "0.0.0.0"], c: 0 },
+        { q: "Alamat 0.0.0.0 biasanya digunakan untuk?", opt: ["Loopback", "Default Route / Unknown", "Broadcast", "Private IP", "Public IP"], c: 1 },
+        { q: "Menjalankan IPv4 dan IPv6 secara bersamaan dalam satu perangkat disebut?", opt: ["Tunneling", "Dual Stack", "Translation", "Mapping", "Switching"], c: 1 },
+        { q: "Broadcast Address pada jaringan 192.168.1.0/24 adalah?", opt: ["192.168.1.1", "192.168.1.100", "192.168.1.254", "192.168.1.255", "192.168.1.0"], c: 3 }
+    ];
+
+    let currentQ = 0;
+    let score = 0;
+    let isFinished = false;
+
+    /* --- RENDER LOGIC --- */
+    function renderApp() {
+        const app = document.getElementById('app');
+
+        if (!isFinished) {
+            // TAMPILAN SOAL (PRETEST MODE: NO FEEDBACK)
+            const q = pretestData[currentQ];
+            app.innerHTML = `
+                <div class="glass-effect p-8 rounded-2xl border border-blue-500/30 fade-in shadow-2xl">
+                    <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+                        <h2 class="text-3xl font-bold text-white tracking-wider">PRE-TEST</h2>
+                        <div class="text-blue-400 font-mono text-xl">Soal ${currentQ + 1} / ${pretestData.length}</div>
+                    </div>
+
+                    <p class="text-xl mb-8 font-medium leading-relaxed">${q.q}</p>
+
+                    <div class="space-y-3">
+                        ${q.opt.map((opt, i) => `
+                            <button onclick="handleAnswer(${i})" class="option-btn w-full text-left p-4 rounded-xl bg-slate-800 border border-slate-600 hover:bg-slate-700 transition-all group flex items-center">
+                                <span class="w-8 h-8 rounded-full bg-slate-900 text-blue-400 flex items-center justify-center mr-4 font-bold border border-slate-700 group-hover:border-blue-500">${String.fromCharCode(65+i)}</span>
+                                <span class="text-lg">${opt}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div class="mt-4 text-xs text-gray-500 text-center font-mono">* Jawaban akan langsung tersimpan. Tidak ada koreksi warna di Pretest.</div>
+                </div>
+            `;
+        } else {
+            // TAMPILAN HASIL AKHIR
+            app.innerHTML = `
+                <div class="glass-effect p-10 rounded-2xl border-2 border-yellow-500 fade-in text-center max-w-2xl mx-auto">
+                    <div class="text-6xl mb-6">🏁</div>
+                    <h1 class="text-4xl font-bold text-white mb-2">Pretest Selesai</h1>
+                    <p class="text-gray-400 mb-8">Data jawaban Anda telah direkam.</p>
+                    
+                    <div class="bg-slate-900/80 p-8 rounded-xl border border-slate-700 mb-8">
+                        <p class="text-sm text-gray-400 uppercase tracking-widest mb-2">Skor Awal Anda</p>
+                        <div class="text-7xl font-bold text-yellow-500 mb-2">${score} <span class="text-3xl text-gray-600">/ 30</span></div>
+                    </div>
+
+                    <button onclick="window.location.reload()" class="px-8 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold transition-all border border-gray-500">
+                        Kembali ke Awal
+                    </button>
+                    <p class="mt-4 text-xs text-red-400">Silakan tutup halaman ini atau lapor ke instruktur.</p>
+                </div>
+            `;
+        }
+    }
+
+    function handleAnswer(selectedIndex) {
+        if(isFinished) return;
+        SFX.select();
+        
+        // Cek jawaban (tapi jangan kasih tau user)
+        if (selectedIndex === pretestData[currentQ].c) {
+            score++;
+        }
+
+        // Efek visual tombol ditekan (hanya highlight sebentar)
+        const btns = document.querySelectorAll('.option-btn');
+        btns.forEach((btn, i) => {
+            btn.disabled = true;
+            if(i === selectedIndex) {
+                btn.classList.add('selected');
+            }
+        });
+
+        // Lanjut soal otomatis setelah delay singkat
+        setTimeout(() => {
+            currentQ++;
+            if (currentQ >= pretestData.length) {
+                isFinished = true;
+                SFX.win();
+            }
+            renderApp();
+        }, 300); // Delay 0.3 detik
+    }
+
+    // Init
+    renderApp();
+  </script>
+</body>
+</html>
